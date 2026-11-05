@@ -32,9 +32,21 @@ debian_sources_backup_unowned() {
    if [ -e "${file_name}" ] || [ -L "${file_name}" ]; then
       query_rc=0
       dpkg-query -S -- "${file_name}" >/dev/null 2>&1 || query_rc="$?"
-      if [ "${query_rc}" = "1" ]; then
-         mv --backup=numbered --no-target-directory --verbose -- "${file_name}" "${backup_name}"
-      fi
+      case "${query_rc}" in
+         0)
+            ## Owned by a package: leave it, nothing to migrate.
+            ;;
+         1)
+            ## Not owned by any package: move aside.
+            mv --backup=numbered --no-target-directory --verbose -- "${file_name}" "${backup_name}"
+            ;;
+         *)
+            ## dpkg-query itself failed (status unknown). Do NOT set the do-once
+            ## marker, so the migration is retried on a later run rather than
+            ## leaving a possible conffile conflict unresolved forever.
+            return 0
+            ;;
+      esac
    fi
 
    touch "${marker}"
